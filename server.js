@@ -12,6 +12,9 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.get("/", (req, res) => {
+  res.send("Digital Hakeem Backend is running!");
+});
 app.use("/chat", chatRoute);
 
 // Server start
