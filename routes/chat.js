@@ -23,9 +23,8 @@ router.get("/sessions/:userId", async (req, res) => {
 router.get("/messages/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
-    // Check if ID is valid MongoDB format
     if (!mongoose.Types.ObjectId.isValid(sessionId)) {
-      return res.status(400).json({ success: false, error: "Invalid session ID format" });
+      return res.status(400).json({ success: false, error: "Invalid session ID" });
     }
     const session = await ChatSession.findById(sessionId);
     if (!session) return res.status(404).json({ success: false, error: "Session not found" });
@@ -41,7 +40,7 @@ router.delete("/session/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(sessionId)) {
-      return res.status(400).json({ success: false, error: "Invalid session ID format" });
+      return res.status(400).json({ success: false, error: "Invalid session ID" });
     }
     await ChatSession.findByIdAndDelete(sessionId);
     res.json({ success: true, message: "Session deleted successfully" });
@@ -59,12 +58,12 @@ router.post("/", async (req, res) => {
 
     let session = null;
 
-    // Safety Check: Only search by ID if it's a valid MongoDB ObjectId
+    // VALIDATION: Only search if sessionId is a valid MongoDB ObjectId
     if (sessionId && mongoose.Types.ObjectId.isValid(sessionId)) {
       session = await ChatSession.findById(sessionId);
     }
 
-    // If no valid session found, create a NEW one
+    // If no valid session found, start a NEW one
     if (!session) {
       session = new ChatSession({ 
         userId, 
@@ -92,7 +91,7 @@ router.post("/", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Chat Error:", err.message);
+    console.error("Backend Error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
