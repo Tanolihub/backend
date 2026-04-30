@@ -1,14 +1,14 @@
 import express from "express";
+import mongoose from "mongoose";
 import { getAIResponse } from "../services/rag.js";
 import { ChatSession } from "../models/Chat.js";
 
 const router = express.Router();
 
-// 1. Get ALL Sessions for a User (List of chats)
+// 1. Get ALL Sessions for a User
 router.get("/sessions/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    // Sirf id, title aur date return karenge (messages nahi taake response fast ho)
     const sessions = await ChatSession.find({ userId })
       .select("title lastUpdated")
       .sort({ lastUpdated: -1 });
@@ -23,6 +23,10 @@ router.get("/sessions/:userId", async (req, res) => {
 router.get("/messages/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
+    // Check if ID is valid MongoDB format
+    if (!mongoose.Types.ObjectId.isValid(sessionId)) {
+      return res.status(400).json({ success: false, error: "Invalid session ID format" });
+    }
     const session = await ChatSession.findById(sessionId);
     if (!session) return res.status(404).json({ success: false, error: "Session not found" });
     
@@ -36,6 +40,9 @@ router.get("/messages/:sessionId", async (req, res) => {
 router.delete("/session/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(sessionId)) {
+      return res.status(400).json({ success: false, error: "Invalid session ID format" });
+    }
     await ChatSession.findByIdAndDelete(sessionId);
     res.json({ success: true, message: "Session deleted successfully" });
   } catch (err) {
@@ -43,30 +50,29 @@ router.delete("/session/:sessionId", async (req, res) => {
   }
 });
 
-// 4. Main Chat Route (Create or Continue a session)
+// 4. Main Chat Route
 router.post("/", async (req, res) => {
   try {
     const { message, userId, sessionId } = req.body; 
 
     if (!userId) return res.status(400).json({ success: false, error: "userId is required" });
 
-    let session;
+    let session = null;
 
-    // Check if we are continuing an old session or starting a new one
-    if (sessionId) {
+    // Safety Check: Only search by ID if it's a valid MongoDB ObjectId
+    if (sessionId && mongoose.Types.ObjectId.isValid(sessionId)) {
       session = await ChatSession.findById(sessionId);
     }
 
-    // If no sessionId or session not found, create a NEW one
+    // If no valid session found, create a NEW one
     if (!session) {
       session = new ChatSession({ 
         userId, 
         messages: [],
-        title: message.substring(0, 30) + (message.length > 30 ? "..." : "") // Use first msg as title
+        title: message ? (message.substring(0, 30) + (message.length > 30 ? "..." : "")) : "New Chat"
       });
     }
 
-    // AI context (last 10 messages)
     const historyForAI = session.messages.slice(-10).map(m => ({
       role: m.role,
       content: m.content
@@ -74,7 +80,6 @@ router.post("/", async (req, res) => {
 
     const answer = await getAIResponse(message, historyForAI);
 
-    // Save to DB
     session.messages.push({ role: "user", content: message });
     session.messages.push({ role: "assistant", content: answer });
     session.lastUpdated = Date.now();
@@ -83,10 +88,11 @@ router.post("/", async (req, res) => {
     res.json({
       success: true,
       answer,
-      sessionId: session._id // Return sessionId so frontend can use it for next msgs
+      sessionId: session._id 
     });
 
   } catch (err) {
+    console.error("Chat Error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
