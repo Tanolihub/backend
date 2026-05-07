@@ -5,7 +5,10 @@ import { ChatSession } from "../models/Chat.js";
 
 const router = express.Router();
 
-// 1. Get ALL Sessions for a User
+/**
+ * 1. GET ALL SESSIONS
+ * Kisi bhi user ki sari purani chats (sessions) ki list nikaalna.
+ */
 router.get("/sessions/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -19,7 +22,10 @@ router.get("/sessions/:userId", async (req, res) => {
   }
 });
 
-// 2. Get full messages for a SPECIFIC Session
+/**
+ * 2. GET SESSION MESSAGES
+ * Kisi aik specific chat k andar k saary messages read karna.
+ */
 router.get("/messages/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -35,7 +41,10 @@ router.get("/messages/:sessionId", async (req, res) => {
   }
 });
 
-// 3. Delete a Session
+/**
+ * 3. DELETE SESSION
+ * Chat session ko delete karna.
+ */
 router.delete("/session/:sessionId", async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -49,7 +58,10 @@ router.delete("/session/:sessionId", async (req, res) => {
   }
 });
 
-// 4. Main Chat Route
+/**
+ * 4. 🌟 MAIN CHAT ROUTE (POST)
+ * Jab user koi naya message bhejta hai, to ye route chalta hai.
+ */
 router.post("/", async (req, res) => {
   try {
     const { message, userId, sessionId } = req.body; 
@@ -58,12 +70,11 @@ router.post("/", async (req, res) => {
 
     let session = null;
 
-    // VALIDATION: Only search if sessionId is a valid MongoDB ObjectId
+    // A. Session dhoondo ya naya banao
     if (sessionId && mongoose.Types.ObjectId.isValid(sessionId)) {
       session = await ChatSession.findById(sessionId);
     }
 
-    // If no valid session found, start a NEW one
     if (!session) {
       session = new ChatSession({ 
         userId, 
@@ -72,18 +83,22 @@ router.post("/", async (req, res) => {
       });
     }
 
+    // B. AI k liye history tyar karna
     const historyForAI = session.messages.slice(-10).map(m => ({
       role: m.role,
       content: m.content
     }));
 
+    // C. AI RESPONSE LENA (GA Optimization isi k andar hoti hai)
     const answer = await getAIResponse(message, historyForAI);
 
+    // D. Chat history save karna
     session.messages.push({ role: "user", content: message });
     session.messages.push({ role: "assistant", content: answer });
     session.lastUpdated = Date.now();
     await session.save();
 
+    // E. Jawaab bhej dena
     res.json({
       success: true,
       answer,

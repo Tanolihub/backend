@@ -1,45 +1,63 @@
 import { loadVectorDB } from "./vectordb.js";
 import { createEmbedding } from "./embedding.js";
 import { generateAnswer } from "./llm.js";
+import { GeneticAlgorithmService } from "./ga.js";
 
-const cosineSimilarity = (a, b) => {
-  let dot = 0, magA = 0, magB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    magA += a[i] * a[i];
-    magB += b[i] * b[i];
-  }
-  const similarity = dot / (Math.sqrt(magA) * Math.sqrt(magB));
-  return isNaN(similarity) ? 0 : similarity;
-};
-
-// 🔥 MAIN FUNCTION (FULL PIPELINE)
+/**
+ * 🌟 REFINED CHAT PIPELINE (Directly using data.txt)
+ * Flow: Sawal -> Vector Search (data.txt) -> GA Optimization -> LLM Final Response
+ */
 export const getAIResponse = async (query, history = []) => {
   const db = loadVectorDB();
 
   if (db.length === 0) {
-    return "Vector DB is empty! Please run ingestion script.";
+    return "Vector DB is empty! Please run 'node scripts/ingest.js' first.";
   }
 
-  // 1. embed query
+  // STEP 1: Vector Search (data.txt se relevant chunks nikaalna)
   const queryEmbedding = await createEmbedding(query);
+  
+  const cosineSimilarity = (a, b) => {
+    let dot = 0, magA = 0, magB = 0;
+    for (let i = 0; i < a.length; i++) {
+      dot += a[i] * b[i];
+      magA += a[i] * a[i];
+      magB += b[i] * b[i];
+    }
+    const similarity = dot / (Math.sqrt(magA) * Math.sqrt(magB));
+    return isNaN(similarity) ? 0 : similarity;
+  };
 
-  // 2. similarity search
   const scored = db.map((item) => ({
-    text: item.text,
+    content: item.text, // Mapping 'text' to 'content' for GA
     score: cosineSimilarity(queryEmbedding, item.embedding),
+    confidence: 0.8, // Default values for GA
+    helpfulness: 0.8
   }));
 
-  // Increase chunk count to 5 for more context
-  const topChunks = scored
+  // STEP 2: Top 15 candidates ko GA k liye select karna
+  const candidates = scored
     .sort((a, b) => b.score - a.score)
-    .slice(0, 5); 
+    .slice(0, 15); 
 
-  // 3. build context
-  const context = topChunks.map((c) => c.text).join("\n\n---\n\n");
+  if (candidates.length === 0) {
+    return "Maaf kijiye, muje aap k sawal k mutabiq koi maloomat nahi mili.";
+  }
 
-  // 4. send to Groq LLM with History
-  const answer = await generateAnswer(query, context, history);
+  // STEP 3: Genetic Algorithm (GA) Optimization
+  // Ye top 15 chunks ma se behtreen info ko "evolve" kar k nikaalay ga.
+  console.log(`🧬 GA is optimizing ${candidates.length} chunks from data.txt...`);
+  const ga = new GeneticAlgorithmService(query, {
+    populationSize: 10,
+    generations: 8,
+    mutationRate: 0.15
+  });
+  
+  const optimizedResponse = await ga.evolve(candidates);
 
-  return answer;
+  // STEP 4: LLM (Groq) se final answer banwana
+  // GA ne jo best combined context diya, LLM usay natural language ma convert kary ga.
+  const finalAnswer = await generateAnswer(query, optimizedResponse.content, history);
+
+  return finalAnswer;
 };
