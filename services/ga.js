@@ -9,7 +9,7 @@ export class GeneticAlgorithmService {
   constructor(query, options = {}) {
     this.query = query.toLowerCase(); // User ka sawal
     this.populationSize = options.populationSize || 5; // Kitny candidates ko aik sath check karna hai
-    this.generations = options.generations || 2; // Kitni baar logic ko refine (evolve) karna hai
+    this.generations = options.generations || 50; // Kitni baar logic ko refine (evolve) karna hai
     this.mutationRate = options.mutationRate || 0.1; // Random tabdeeli ki sharah
   }
 
