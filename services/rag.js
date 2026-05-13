@@ -35,7 +35,7 @@ export const getAIResponse = async (query, history = []) => {
     helpfulness: 0.8
   }));
 
-  // STEP 2: Top 15 candidates ko GA k liye select karna
+  // STEP 2: Top candidates ko GA k liye select karna
   const candidates = scored
     .sort((a, b) => b.score - a.score)
     .slice(0, 15); 
@@ -45,13 +45,8 @@ export const getAIResponse = async (query, history = []) => {
   }
 
   // STEP 3: Genetic Algorithm (GA) Optimization
-  // Ye top 15 chunks ma se behtreen info ko "evolve" kar k nikaalay ga.
   console.log(`🧬 GA is optimizing ${candidates.length} chunks from data.txt...`);
-  const ga = new GeneticAlgorithmService(query, {
-    populationSize: 10,
-    generations: 8,
-    mutationRate: 0.15
-  });
+  const ga = new GeneticAlgorithmService(query);
   
   const optimizedResponse = await ga.evolve(candidates);
 
